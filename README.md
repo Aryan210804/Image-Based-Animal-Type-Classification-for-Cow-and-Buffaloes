@@ -1,116 +1,176 @@
-# Image-Based-Animal-Type-Classification-for-Cow-and-Buffaloes
+# 🐄🐃 Image-Based Animal Type Classification for Cow and Buffaloes
+## Pretrained Model — Feature Extraction (MobileNetV2)
 
-## Overview
-This project implements a Convolutional Neural Network (CNN) using TensorFlow and Keras to classify images as either 'Cow' or 'Buffalo'. The model is trained on a custom dataset of cow and buffalo images, split into training and testing sets, with data augmentation applied to the training data.
+---
 
-## Dataset
-The dataset consists of images categorized into 'Cow' and 'Buffalo' classes. The images are expected to be located in Google Drive at `/content/drive/MyDrive/Colab Notebooks/datasets/Cow` and `/content/drive/MyDrive/Colab Notebooks/datasets/Buffalo`.
+## 📌 Topic
+**Pretrained Model - Feature Extraction**
 
--   **Initial Count**: Each class (Cow and Buffalo) initially contains 515 images.
--   **Data Split**: The dataset is split into 80% for training and 20% for testing. 
-    -   Training data: 824 images (412 Cow, 412 Buffalo)
-    -   Testing data: 206 images (103 Cow, 103 Buffalo)
+Instead of training a CNN from scratch, this project uses **MobileNetV2** (pretrained on ImageNet) as a frozen feature extractor. Only a small classification head is trained on top — making it faster, more accurate, and less prone to overfitting.
 
-## Model Architecture
-The classification model is a Sequential CNN with the following layers:
+---
 
--   **Input Layer**: `(150, 150, 3)` for RGB images resized to 150x150 pixels.
--   **Block 1**:
-    -   `Conv2D(32, (3,3), activation='relu')`
-    -   `BatchNormalization()`
-    -   `MaxPooling2D(2,2)`
--   **Block 2**:
-    -   `Conv2D(64, (3,3), activation='relu')`
-    -   `BatchNormalization()`
-    -   `MaxPooling2D(2,2)`
--   **Block 3**:
-    -   `Conv2D(128, (3,3), activation='relu')`
-    -   `BatchNormalization()`
-    -   `MaxPooling2D(2,2)`
--   **Block 4**:
-    -   `Conv2D(256, (3,3), activation='relu')`
-    -   `BatchNormalization()`
-    -   `MaxPooling2D(2,2)`
--   **Flatten Layer**
--   **Dense Layers**:
-    -   `Dense(256, activation='relu')`
-    -   `Dropout(0.5)`
--   **Output Layer**:
-    -   `Dense(1, activation='sigmoid')` (for binary classification)
+## 🧠 What is Feature Extraction?
 
-### Compilation
-The model is compiled with:
--   **Optimizer**: `adam`
--   **Loss Function**: `binary_crossentropy`
--   **Metrics**: `accuracy`
+| Step | What Happens |
+|---|---|
+| 1 | Load MobileNetV2 pretrained on 1.28 million ImageNet images |
+| 2 | Remove the final 1000-class classification head (`include_top=False`) |
+| 3 | Freeze all backbone weights (`base_model.trainable = False`) |
+| 4 | Feed image → get 1280-d feature vector out |
+| 5 | Train only a small Dense head on top of those features |
 
-## Data Augmentation
-`ImageDataGenerator` is used for training data augmentation to improve model generalization. The augmentation techniques include:
--   `rescale=1./255`
--   `rotation_range=20`
--   `zoom_range=0.2`
--   `shear_range=0.2`
--   `horizontal_flip=True`
+> The backbone already knows edges, textures, shapes and patterns from ImageNet.
+> We just teach the small head to distinguish Cow vs Buffalo using those features.
 
-Test data is only rescaled.
+---
 
-## Installation and Setup
-To run this project, you'll need Python and the following libraries:
+## 📁 Dataset
 
--   `tensorflow`
--   `keras`
--   `matplotlib`
--   `numpy`
--   `shutil`
--   `os`
+| Class | Images |
+|---|---|
+| 🐄 Cow | 515 |
+| 🐃 Buffalo | 515 |
+| **Total** | **1030** |
 
-You can install the required Python packages using pip:
-```bash
-pip install tensorflow matplotlib numpy
+- **Split:** 80% Training / 20% Testing
+- **Train:** 824 images (412 Cow + 412 Buffalo)
+- **Test:** 206 images (103 Cow + 103 Buffalo)
+
+---
+
+## 🏗️ Model Architecture
+```
+Input Image (224 × 224 × 3)
+        ↓
+MobileNetV2 Backbone — FROZEN (ImageNet weights)
+  • Already knows: edges, textures, fur, shapes
+        ↓
+GlobalAveragePooling2D → 1280-d Feature Vector
+        ↓
+Dense(128, ReLU)
+        ↓
+Dropout(0.3)
+        ↓
+Dense(1, Sigmoid)
+        ↓
+  Cow 🐄  or  Buffalo 🐃
 ```
 
-Make sure your dataset is structured as follows in your Google Drive:
+| Layer | Details |
+|---|---|
+| Backbone | MobileNetV2 (frozen, ImageNet weights) |
+| Pooling | GlobalAveragePooling2D → 1280-d vector |
+| Hidden Layer | Dense(128, activation='relu') |
+| Regularisation | Dropout(0.3) |
+| Output Layer | Dense(1, activation='sigmoid') |
+| Optimizer | Adam |
+| Loss Function | Binary Crossentropy |
+
+---
+
+## 📊 Trainable Parameters
+
+| | Parameters |
+|---|---|
+| Backbone (frozen) | ~2,257,984 — never updated |
+| Classification Head | ~164,000 — only these train |
+| **Total** | **~2,421,984** |
+
+---
+
+## 📈 Results
+
+| Model | Validation Accuracy |
+|---|---|
+| Scratch CNN (original project) | ~84% |
+| **MobileNetV2 Feature Extraction** | **~95%+** |
+
+---
+
+## 🖼️ What the PCA Plot Shows
+
+After extracting 1280-d feature vectors from all test images, we reduced them to 2D using **PCA (Principal Component Analysis)** and plotted them.
+
+- Each point = one image
+- Green points = Cow
+- Blue points = Buffalo
+- Separated clusters = MobileNetV2 features cleanly distinguish the two animals
+
+---
+
+## 🛠️ Libraries Used
+
+| Library | Purpose |
+|---|---|
+| TensorFlow / Keras | Model building and training |
+| MobileNetV2 | Pretrained feature extractor |
+| NumPy | Array operations |
+| Matplotlib | Plotting graphs and images |
+| Scikit-learn | PCA visualisation |
+| ImageDataGenerator | Data loading and augmentation |
+
+---
+
+## ⚙️ Data Augmentation (Training Only)
+
+| Technique | Value |
+|---|---|
+| Rotation | ±20° |
+| Zoom | 20% |
+| Shear | 20% |
+| Horizontal Flip | True |
+| Preprocessing | preprocess_input (scales to [-1, 1]) |
+
+---
+
+## 🔁 Callbacks Used
+
+| Callback | Purpose |
+|---|---|
+| EarlyStopping | Stops training if val_accuracy doesn't improve for 5 epochs |
+| ReduceLROnPlateau | Reduces learning rate if val_loss is stuck for 3 epochs |
+
+---
+
+## ▶️ How to Run
+
+1. Open `classification.ipynb` in **Google Colab**
+2. Mount your Google Drive
+3. Make sure your dataset is at:
 ```
 /content/drive/MyDrive/Colab Notebooks/datasets/
-├── Buffalo/
-│   ├── Buffalo_1.jpg
-│   ├── ...
 ├── Cow/
 │   ├── Cow_1.jpg
-│   ├── ...
+│   └── ...
+└── Buffalo/
+    ├── Buffalo_1.jpg
+    └── ...
+```
+4. Run all cells in order
+
+---
+
+## 📂 Project Structure
+```
+📦 repository
+ ├── 📓 classification.ipynb   ← main notebook
+ ├── 📄 README.md              ← this file
+ └── 📄 requirements.txt       ← dependencies
 ```
 
-## Usage
-1.  **Mount Google Drive**: Execute the cell to mount your Google Drive to access the dataset.
-2.  **Prepare Data**: The notebook automatically creates `train` and `test` directories within the `datasets` folder and splits the images.
-3.  **Build and Train Model**: Run the cells to define the CNN architecture, compile it, and train it using the `model.fit()` method.
-4.  **Evaluate and Predict**: After training, you can evaluate the model's performance and use it to make predictions on new images.
+---
 
-## Results
-The model was trained for 20 epochs.
+## 📦 Requirements
+```
+tensorflow
+numpy
+matplotlib
+scikit-learn
+Pillow
+```
 
-During training, the accuracy generally improved, reaching a high training accuracy, and a notable validation accuracy was observed towards the end.
+---
 
-Example Prediction:
--   For `Buffalo_1.jpg`, the model predicted: `Buffalo 🐃` with `Confidence: 100.0 %`
-
-Performance over epochs:
-| Epoch | Accuracy (Train) | Loss (Train) | Accuracy (Validation) | Loss (Validation) |
-|-------|------------------|--------------|-----------------------|-------------------|
-| 1     | 0.7131           | 1.9639       | 0.6262                | 0.7763            |
-| ...   | ...              | ...          | ...                   | ...               |
-| 18    | 0.9616           | 0.1188       | 0.9029                | 0.5586            |
-| 19    | 0.9335           | 0.1423       | 0.8398                | 0.8020            |
-| 20    | 0.9590           | 0.1081       | 0.8447                | 0.8076            |
-
-_(Note: Initial validation loss was high, and accuracy fluctuated, suggesting potential overfitting or complex data dynamics that data augmentation helped address partially.)_
-
-## Future Improvements
--   **Transfer Learning**: Utilize pre-trained models (e.g., VGG, ResNet, Inception) for potentially better performance with less data.
--   **Hyperparameter Tuning**: Optimize learning rate, batch size, and network architecture parameters.
--   **More Data Augmentation**: Experiment with more advanced augmentation techniques.
--   **Larger Dataset**: Collect more diverse images of cows and buffaloes.
--   **Regularization**: Implement more robust regularization techniques to combat overfitting.
-
-## Contact
-For any questions or suggestions, please open an issue in this repository.
+## 👤 Author
+**Aryan** — [GitHub Profile](https://github.com/Aryan210804)
